@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sync InstantDB Schema</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .code-block {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 20px 0;
+        }
+        .step {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f9f9f9;
+            border-left: 4px solid #ff6b35;
+            border-radius: 4px;
+        }
+        h1 {
+            color: #ff6b35;
+        }
+        h2 {
+            color: #333;
+            margin-top: 30px;
+        }
+        .warning {
+            background: #fff3cd;
+            border-left-color: #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>InstantDB Schema Sync Guide</h1>
+    
+    <div class="warning">
+        <strong>Important:</strong> Your InstantDB dashboard only shows <code>$files</code> and <code>$users</code> because the custom schema hasn't been synced yet. Follow these steps to create the <code>memes</code> and <code>upvotes</code> tables.
+    </div>
+
+    <h2>Method 1: Using InstantDB CLI (Recommended)</h2>
+    
+    <div class="step">
+        <h3>Step 1: Install InstantDB CLI</h3>
+        <div class="code-block">
+            npm install -g @instantdb/cli
+        </div>
+    </div>
+
+    <div class="step">
+        <h3>Step 2: Login to InstantDB</h3>
+        <div class="code-block">
+            instant login
+        </div>
+    </div>
+
+    <div class="step">
+        <h3>Step 3: Sync Schema</h3>
+        <p>Navigate to your project directory and run:</p>
+        <div class="code-block">
+            instant sync --app-id 2cc27c95-cf7d-4fe7-9fe4-4c56c35cda96
+        </div>
+        <p>Or if you have the schema file in the current directory:</p>
+        <div class="code-block">
+            instant sync instant.schema.js --app-id 2cc27c95-cf7d-4fe7-9fe4-4c56c35cda96
+        </div>
+    </div>
+
+    <h2>Method 2: Manual Setup via Dashboard</h2>
+    
+    <div class="step">
+        <h3>Step 1: Go to InstantDB Dashboard</h3>
+        <p>Visit: <a href="https://www.instantdb.com/dashboard" target="_blank">https://www.instantdb.com/dashboard</a></p>
+        <p>Select your app: <code>2cc27c95-cf7d-4fe7-9fe4-4c56c35cda96</code></p>
+    </div>
+
+    <div class="step">
+        <h3>Step 2: Create "memes" Entity</h3>
+        <p>In the Schema section, create a new entity called <code>memes</code> with these fields:</p>
+        <div class="code-block">
+            - imageData: string (required)
+            - title: string (optional)
+            - authorId: string (required)
+            - authorEmail: string (required)
+            - createdAt: number (required)
+        </div>
+        <p><strong>Permissions:</strong></p>
+        <ul>
+            <li><strong>Read:</strong> Everyone (public)</li>
+            <li><strong>Create:</strong> Authenticated users only</li>
+            <li><strong>Update:</strong> Author only (ctx.auth.id === entity.authorId)</li>
+            <li><strong>Delete:</strong> Author only (ctx.auth.id === entity.authorId)</li>
+        </ul>
+    </div>
+
+    <div class="step">
+        <h3>Step 3: Create "upvotes" Entity</h3>
+        <p>Create another entity called <code>upvotes</code> with these fields:</p>
+        <div class="code-block">
+            - memeId: string (required)
+            - userId: string (required)
+            - createdAt: number (required)
+        </div>
+        <p><strong>Permissions:</strong></p>
+        <ul>
+            <li><strong>Read:</strong> Everyone (public)</li>
+            <li><strong>Create:</strong> Authenticated users only</li>
+            <li><strong>Update:</strong> Disabled</li>
+            <li><strong>Delete:</strong> User can delete own upvotes (ctx.auth.id === entity.userId)</li>
+        </ul>
+    </div>
+
+    <h2>Method 3: Use the Schema File Directly</h2>
+    
+    <div class="step">
+        <h3>Copy Schema Content</h3>
+        <p>Your schema file (<code>instant.schema.js</code>) contains the correct structure. You can:</p>
+        <ol>
+            <li>Copy the content from <code>instant.schema.js</code></li>
+            <li>Go to InstantDB Dashboard → Schema</li>
+            <li>Click "Import Schema" or paste the schema definition</li>
+        </ol>
+    </div>
+
+    <h2>After Syncing</h2>
+    
+    <div class="step">
+        <p>Once the schema is synced, you should see:</p>
+        <ul>
+            <li><code>$files</code> (system table)</li>
+            <li><code>$users</code> (system table)</li>
+            <li><code>memes</code> (your custom table)</li>
+            <li><code>upvotes</code> (your custom table)</li>
+        </ul>
+        <p>Then your app will be able to store memes and upvotes!</p>
+    </div>
+
+    <div class="warning">
+        <strong>Note:</strong> If you're using the InstantDB React SDK, make sure your schema file is properly configured. The schema should automatically sync when you deploy or use the CLI tool.
+    </div>
+</body>
+</html>
+
