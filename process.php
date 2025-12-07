@@ -62,18 +62,28 @@ switch ($mimeType) {
 $width = imagesx($image);
 $height = imagesy($image);
 
-// Get text inputs
+// Get text elements from JSON
+$textElements = [];
+if (isset($_POST['textElements']) && !empty($_POST['textElements'])) {
+    $textElementsJson = $_POST['textElements'];
+    $textElements = json_decode($textElementsJson, true);
+    if (!is_array($textElements)) {
+        $textElements = [];
+    }
+}
+
+// Legacy support for topText/bottomText (fallback)
 $topText = isset($_POST['topText']) ? $_POST['topText'] : '';
 $bottomText = isset($_POST['bottomText']) ? $_POST['bottomText'] : '';
 $fontSize = isset($_POST['fontSize']) ? intval($_POST['fontSize']) : 40;
 
-// Get custom text positions
+// Get custom text positions (legacy)
 $topX = isset($_POST['topX']) ? intval($_POST['topX']) : null;
 $topY = isset($_POST['topY']) ? intval($_POST['topY']) : null;
 $bottomX = isset($_POST['bottomX']) ? intval($_POST['bottomX']) : null;
 $bottomY = isset($_POST['bottomY']) ? intval($_POST['bottomY']) : null;
 
-// Get color values
+// Get color values (legacy - used as defaults)
 $textColorHex = isset($_POST['textColor']) ? $_POST['textColor'] : '#ffffff';
 $borderColorHex = isset($_POST['borderColor']) ? $_POST['borderColor'] : '#000000';
 
@@ -189,25 +199,35 @@ function addTextWithBorder($image, $text, $x, $y, $fontSize, $fontPath = null, $
     
     if ($fontPath && file_exists($fontPath)) {
         // Use TTF font for better quality
+        // Calculate starting Y position (center vertically for first line)
+        $totalHeight = count($lines) * $lineHeight;
+        $startY = $y - ($totalHeight / 2) + ($lineHeight / 2);
+        
         foreach ($lines as $index => $line) {
             if (empty($line)) continue;
             
-            $lineY = $y + ($index * $lineHeight);
+            $lineY = $startY + ($index * $lineHeight);
             
             // Skip if line would be outside canvas vertically
             if ($lineY < 0 || $lineY + $currentFontSize > $imageHeight) continue;
             
-            // Get line width for bounds checking
+            // Get line width for bounds checking and centering
             $bbox = imagettfbbox($currentFontSize, 0, $fontPath, $line);
             $lineWidth = abs($bbox[4] - $bbox[0]);
             
+            // Center the text around x position
+            $adjustedX = $x - ($lineWidth / 2);
+            
             // Adjust x position if text would go outside canvas horizontally
-            $adjustedX = $x;
-            if ($adjustedX < $padding) $adjustedX = $padding;
+            if ($adjustedX < $padding) {
+                $adjustedX = $padding;
+            }
             if ($adjustedX + $lineWidth > $imageWidth - $padding) {
                 $adjustedX = $imageWidth - $padding - $lineWidth;
             }
-            if ($adjustedX < $padding) $adjustedX = $padding; // Ensure minimum padding
+            if ($adjustedX < $padding) {
+                $adjustedX = $padding; // Ensure minimum padding
+            }
             
             // Add border by drawing text multiple times in different positions
             for ($i = -$borderThickness; $i <= $borderThickness; $i++) {
@@ -225,24 +245,34 @@ function addTextWithBorder($image, $text, $x, $y, $fontSize, $fontPath = null, $
         $font = 5;
         $scaledLineHeight = (int)($currentFontSize * 1.2);
         
+        // Calculate starting Y position (center vertically for first line)
+        $totalHeight = count($lines) * $scaledLineHeight;
+        $startY = $y - ($totalHeight / 2) + ($scaledLineHeight / 2);
+        
         foreach ($lines as $index => $line) {
             if (empty($line)) continue;
             
-            $lineY = $y + ($index * $scaledLineHeight);
+            $lineY = $startY + ($index * $scaledLineHeight);
             
             // Skip if line would be outside canvas vertically
             if ($lineY < 0 || $lineY + $currentFontSize > $imageHeight) continue;
             
-            // Estimate line width for bounds checking
+            // Estimate line width for bounds checking and centering
             $lineWidth = strlen($line) * imagefontwidth($font);
             
+            // Center the text around x position
+            $adjustedX = $x - ($lineWidth / 2);
+            
             // Adjust x position if text would go outside canvas horizontally
-            $adjustedX = $x;
-            if ($adjustedX < $padding) $adjustedX = $padding;
+            if ($adjustedX < $padding) {
+                $adjustedX = $padding;
+            }
             if ($adjustedX + $lineWidth > $imageWidth - $padding) {
                 $adjustedX = $imageWidth - $padding - $lineWidth;
             }
-            if ($adjustedX < $padding) $adjustedX = $padding;
+            if ($adjustedX < $padding) {
+                $adjustedX = $padding;
+            }
             
             // Draw border
             for ($i = -2; $i <= 2; $i++) {
@@ -262,79 +292,110 @@ function addTextWithBorder($image, $text, $x, $y, $fontSize, $fontPath = null, $
 $padding = 40;
 $maxTextWidth = $width - ($padding * 2);
 
-// Top text position (use custom position if provided, otherwise center)
-if (!empty($topText)) {
-    // Wrap text to get lines
-    $topLines = wrapText($topText, $maxTextWidth, $fontSize, $fontPath);
-    
-    if ($topX !== null && $topY !== null) {
-        // Use custom position from drag, but ensure it's within bounds
-        $x = max($padding, min($width - $padding, $topX));
-        $y = max($padding, min($height - $padding, $topY));
-    } else {
-        // Default: centered horizontally, near top
-        // Calculate max line width for centering
-        $maxLineWidth = 0;
-        foreach ($topLines as $line) {
-            if ($fontPath && file_exists($fontPath)) {
-                $bbox = imagettfbbox($fontSize, 0, $fontPath, $line);
-                $lineWidth = abs($bbox[4] - $bbox[0]);
-            } else {
-                $lineWidth = strlen($line) * ($fontSize * 0.6);
-            }
-            if ($lineWidth > $maxLineWidth) {
-                $maxLineWidth = $lineWidth;
-            }
+// Process text elements from JSON (new format)
+if (!empty($textElements)) {
+    foreach ($textElements as $textElement) {
+        if (!isset($textElement['text']) || empty($textElement['text'])) {
+            continue;
         }
         
-        // Center horizontally, but ensure it stays within bounds
-        $x = ($width - $maxLineWidth) / 2;
-        $x = max($padding, min($x, $width - $maxLineWidth - $padding));
+        $text = $textElement['text'];
+        $elementFontSize = isset($textElement['fontSize']) ? intval($textElement['fontSize']) : $fontSize;
+        $elementFontSize = max(12, min(150, $elementFontSize));
         
-        // Position near top, but ensure it stays within bounds
-        $y = $padding;
-        $y = max($padding, min($y, $height - $padding));
+        // Get position
+        $x = isset($textElement['x']) ? intval($textElement['x']) : ($width / 2);
+        $y = isset($textElement['y']) ? intval($textElement['y']) : ($height / 2);
+        
+        // Ensure position is within bounds
+        $x = max($padding, min($width - $padding, $x));
+        $y = max($padding, min($height - $padding, $y));
+        
+        // Get colors
+        $elementTextColorHex = isset($textElement['color']) ? $textElement['color'] : $textColorHex;
+        $elementBorderColorHex = isset($textElement['borderColor']) ? $textElement['borderColor'] : $borderColorHex;
+        
+        $elementTextColorRgb = hexToRgb($elementTextColorHex);
+        $elementBorderColorRgb = hexToRgb($elementBorderColorHex);
+        
+        // Add text to image
+        addTextWithBorder($image, $text, $x, $y, $elementFontSize, $fontPath, $elementTextColorRgb, $elementBorderColorRgb, $maxTextWidth);
     }
-    addTextWithBorder($image, $topText, $x, $y, $fontSize, $fontPath, $textColorRgb, $borderColorRgb, $maxTextWidth);
-}
+} else {
+    // Legacy support: Top text position (use custom position if provided, otherwise center)
+    if (!empty($topText)) {
+        // Wrap text to get lines
+        $topLines = wrapText($topText, $maxTextWidth, $fontSize, $fontPath);
+        
+        if ($topX !== null && $topY !== null) {
+            // Use custom position from drag, but ensure it's within bounds
+            $x = max($padding, min($width - $padding, $topX));
+            $y = max($padding, min($height - $padding, $topY));
+        } else {
+            // Default: centered horizontally, near top
+            // Calculate max line width for centering
+            $maxLineWidth = 0;
+            foreach ($topLines as $line) {
+                if ($fontPath && file_exists($fontPath)) {
+                    $bbox = imagettfbbox($fontSize, 0, $fontPath, $line);
+                    $lineWidth = abs($bbox[4] - $bbox[0]);
+                } else {
+                    $lineWidth = strlen($line) * ($fontSize * 0.6);
+                }
+                if ($lineWidth > $maxLineWidth) {
+                    $maxLineWidth = $lineWidth;
+                }
+            }
+            
+            // Center horizontally, but ensure it stays within bounds
+            $x = ($width - $maxLineWidth) / 2;
+            $x = max($padding, min($x, $width - $maxLineWidth - $padding));
+            
+            // Position near top, but ensure it stays within bounds
+            $y = $padding;
+            $y = max($padding, min($y, $height - $padding));
+        }
+        addTextWithBorder($image, $topText, $x, $y, $fontSize, $fontPath, $textColorRgb, $borderColorRgb, $maxTextWidth);
+    }
 
-// Bottom text position (use custom position if provided, otherwise center)
-if (!empty($bottomText)) {
-    // Wrap text to get lines
-    $bottomLines = wrapText($bottomText, $maxTextWidth, $fontSize, $fontPath);
-    
-    if ($bottomX !== null && $bottomY !== null) {
-        // Use custom position from drag, but ensure it's within bounds
-        $x = max($padding, min($width - $padding, $bottomX));
-        $y = max($padding, min($height - $padding, $bottomY));
-    } else {
-        // Default: centered horizontally, near bottom
-        // Calculate max line width for centering
-        $maxLineWidth = 0;
-        foreach ($bottomLines as $line) {
-            if ($fontPath && file_exists($fontPath)) {
-                $bbox = imagettfbbox($fontSize, 0, $fontPath, $line);
-                $lineWidth = abs($bbox[4] - $bbox[0]);
-            } else {
-                $lineWidth = strlen($line) * ($fontSize * 0.6);
+    // Legacy support: Bottom text position (use custom position if provided, otherwise center)
+    if (!empty($bottomText)) {
+        // Wrap text to get lines
+        $bottomLines = wrapText($bottomText, $maxTextWidth, $fontSize, $fontPath);
+        
+        if ($bottomX !== null && $bottomY !== null) {
+            // Use custom position from drag, but ensure it's within bounds
+            $x = max($padding, min($width - $padding, $bottomX));
+            $y = max($padding, min($height - $padding, $bottomY));
+        } else {
+            // Default: centered horizontally, near bottom
+            // Calculate max line width for centering
+            $maxLineWidth = 0;
+            foreach ($bottomLines as $line) {
+                if ($fontPath && file_exists($fontPath)) {
+                    $bbox = imagettfbbox($fontSize, 0, $fontPath, $line);
+                    $lineWidth = abs($bbox[4] - $bbox[0]);
+                } else {
+                    $lineWidth = strlen($line) * ($fontSize * 0.6);
+                }
+                if ($lineWidth > $maxLineWidth) {
+                    $maxLineWidth = $lineWidth;
+                }
             }
-            if ($lineWidth > $maxLineWidth) {
-                $maxLineWidth = $lineWidth;
-            }
+            
+            // Center horizontally, but ensure it stays within bounds
+            $x = ($width - $maxLineWidth) / 2;
+            $x = max($padding, min($x, $width - $maxLineWidth - $padding));
+            
+            $lineHeight = $fontSize * 1.2;
+            $totalHeight = count($bottomLines) * $lineHeight;
+            
+            // Position near bottom, but ensure it stays within bounds
+            $y = $height - $totalHeight - $padding;
+            $y = max($padding, min($y, $height - $totalHeight - $padding));
         }
-        
-        // Center horizontally, but ensure it stays within bounds
-        $x = ($width - $maxLineWidth) / 2;
-        $x = max($padding, min($x, $width - $maxLineWidth - $padding));
-        
-        $lineHeight = $fontSize * 1.2;
-        $totalHeight = count($bottomLines) * $lineHeight;
-        
-        // Position near bottom, but ensure it stays within bounds
-        $y = $height - $totalHeight - $padding;
-        $y = max($padding, min($y, $height - $totalHeight - $padding));
+        addTextWithBorder($image, $bottomText, $x, $y, $fontSize, $fontPath, $textColorRgb, $borderColorRgb, $maxTextWidth);
     }
-    addTextWithBorder($image, $bottomText, $x, $y, $fontSize, $fontPath, $textColorRgb, $borderColorRgb, $maxTextWidth);
 }
 
 // Output the image
