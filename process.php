@@ -66,7 +66,18 @@ $height = imagesy($image);
 $textElements = [];
 if (isset($_POST['textElements']) && !empty($_POST['textElements'])) {
     $textElementsJson = $_POST['textElements'];
-    $textElements = json_decode($textElementsJson, true);
+    // Handle both string and already-decoded array
+    if (is_string($textElementsJson)) {
+        $textElements = json_decode($textElementsJson, true);
+        // Check for JSON decode errors
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            error_log("JSON decode error: " . json_last_error_msg());
+            $textElements = [];
+        }
+    } else if (is_array($textElementsJson)) {
+        $textElements = $textElementsJson;
+    }
+    
     if (!is_array($textElements)) {
         $textElements = [];
     }
@@ -109,10 +120,27 @@ $fontSize = max(20, min(100, $fontSize));
 // Path to font file - try multiple common system fonts
 $fontPaths = [
     __DIR__ . '/arial.ttf',
+    __DIR__ . '/Arial.ttf',
+    __DIR__ . '/fonts/arial.ttf',
+    __DIR__ . '/fonts/Arial.ttf',
+    // Windows paths
     'C:/Windows/Fonts/arial.ttf',
     'C:/Windows/Fonts/Arial.ttf',
+    'C:/Windows/Fonts/ARIAL.TTF',
+    // Linux paths (most common)
     '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
-    '/System/Library/Fonts/Helvetica.ttc'
+    '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+    '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf',
+    '/usr/share/fonts/TTF/DejaVuSans.ttf',
+    '/usr/share/fonts/TTF/arial.ttf',
+    '/usr/share/fonts/TTF/Arial.ttf',
+    '/usr/share/fonts/truetype/ttf-dejavu/DejaVuSans.ttf',
+    '/usr/share/fonts/truetype/ttf-liberation/LiberationSans-Regular.ttf',
+    '/usr/share/fonts/opentype/liberation/LiberationSans-Regular.otf',
+    // macOS paths
+    '/System/Library/Fonts/Helvetica.ttc',
+    '/Library/Fonts/Arial.ttf',
+    '/System/Library/Fonts/Supplemental/Arial.ttf'
 ];
 
 $fontPath = null;
@@ -122,6 +150,9 @@ foreach ($fontPaths as $path) {
         break;
     }
 }
+
+// Debug: Log font path (comment out in production if needed)
+// error_log("Font path found: " . ($fontPath ? $fontPath : 'NONE - using built-in font'));
 
 // Function to wrap text into multiple lines
 function wrapText($text, $maxWidth, $fontSize, $fontPath = null) {
@@ -300,8 +331,21 @@ if (!empty($textElements)) {
         }
         
         $text = $textElement['text'];
-        $elementFontSize = isset($textElement['fontSize']) ? intval($textElement['fontSize']) : $fontSize;
+        // Get fontSize from element, fallback to POST fontSize, then default to 40
+        // Handle both string and numeric fontSize values
+        $rawFontSize = isset($textElement['fontSize']) ? $textElement['fontSize'] : null;
+        if ($rawFontSize === null || $rawFontSize === '' || $rawFontSize === 0) {
+            $rawFontSize = isset($_POST['fontSize']) ? $_POST['fontSize'] : 40;
+        }
+        
+        // Convert to integer, handling string numbers
+        $elementFontSize = is_numeric($rawFontSize) ? intval($rawFontSize) : 40;
+        
+        // Ensure fontSize is within reasonable bounds
         $elementFontSize = max(12, min(150, $elementFontSize));
+        
+        // Debug logging (uncomment for troubleshooting)
+        // error_log("Text element fontSize: " . $elementFontSize . " (raw: " . var_export($rawFontSize, true) . ")");
         
         // Get position
         $x = isset($textElement['x']) ? intval($textElement['x']) : ($width / 2);

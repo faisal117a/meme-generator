@@ -20,7 +20,7 @@ A simple and elegant PHP-based meme generator that allows users to upload images
 - Web server (Apache/Nginx) or XAMPP/WAMP/MAMP
 - Modern web browser
 
-## 📦 Installation
+## 📦 Installation (Local Development)
 
 1. **Clone or download this repository** to your web server directory:
    - For XAMPP: `C:\xampp\htdocs\cursor2\`
@@ -31,10 +31,27 @@ A simple and elegant PHP-based meme generator that allows users to upload images
    - In XAMPP, it's usually enabled by default
    - Check `phpinfo()` if unsure
 
-3. **Optional: Add TTF Font (for better text quality)**:
+3. **Set up InstantDB**:
+   - Follow the instructions in `INSTANTDB_SETUP.md`
+   - Sync your schema using `instant.schema.js`
+   - Verify your App ID is configured correctly
+
+4. **Optional: Add TTF Font (for better text quality)**:
    - Download a free font (e.g., Arial, Roboto, or any TTF font)
    - Save it as `arial.ttf` in the project root directory
    - The application will automatically use it if available
+
+## 🚀 Deployment
+
+For production deployment instructions, see **[DEPLOYMENT.md](DEPLOYMENT.md)**.
+
+The guide covers:
+- Shared hosting (cPanel, etc.)
+- VPS/Cloud hosting (DigitalOcean, AWS, etc.)
+- Docker deployment
+- Nginx configuration
+- Security hardening
+- Performance optimization
 
 ## 🎯 Usage
 

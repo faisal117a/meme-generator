@@ -1652,7 +1652,13 @@
             fontSizeValue.textContent = this.value;
             // Update selected text element font size if one is selected
             if (selectedTextElement) {
-                selectedTextElement.fontSize = parseInt(this.value);
+                const newFontSize = parseInt(this.value);
+                selectedTextElement.fontSize = newFontSize;
+                // Also update the element in the textElements array
+                const elementIndex = textElements.findIndex(el => el.id === selectedTextElement.id);
+                if (elementIndex !== -1) {
+                    textElements[elementIndex].fontSize = newFontSize;
+                }
                 drawCanvas();
             }
         });
@@ -1710,6 +1716,14 @@
                     
                     if (newFontSize !== selectedTextElement.fontSize) {
                         selectedTextElement.fontSize = newFontSize;
+                        // Update the element in textElements array
+                        const elementIndex = textElements.findIndex(el => el.id === selectedTextElement.id);
+                        if (elementIndex !== -1) {
+                            textElements[elementIndex].fontSize = newFontSize;
+                        }
+                        // Update slider to reflect new size
+                        fontSizeSlider.value = newFontSize;
+                        fontSizeValue.textContent = newFontSize;
                         drawCanvas();
                     }
                 };
@@ -1736,6 +1750,20 @@
             const element = findTextElementAt(x, y);
             if (element) {
                 selectedTextElement = element;
+                // Sync slider with selected element's fontSize
+                if (element.fontSize) {
+                    fontSizeSlider.value = element.fontSize;
+                    fontSizeValue.textContent = element.fontSize;
+                }
+                // Sync color pickers with selected element's colors
+                if (element.color) {
+                    textColorPicker.value = element.color;
+                    textColor = element.color;
+                }
+                if (element.borderColor) {
+                    borderColorPicker.value = element.borderColor;
+                    borderColor = element.borderColor;
+                }
                 isDragging = true;
                 dragOffset.x = x - element.x;
                 dragOffset.y = y - element.y;
@@ -1819,6 +1847,22 @@
                 generateBtn.textContent = 'Generate';
                 return;
             }
+            
+            // Ensure all text elements have fontSize property before sending
+            const currentFontSize = parseInt(fontSizeSlider.value) || 40;
+            textElements.forEach(element => {
+                // Ensure fontSize is a number, not a string
+                if (element.fontSize) {
+                    element.fontSize = parseInt(element.fontSize) || currentFontSize;
+                } else {
+                    element.fontSize = currentFontSize;
+                }
+                // Ensure fontSize is within bounds
+                element.fontSize = Math.max(12, Math.min(150, element.fontSize));
+            });
+            
+            // Also send fontSize as a separate POST parameter for fallback
+            formData.append('fontSize', currentFontSize);
             
             // Add text elements data as JSON
             formData.append('textElements', JSON.stringify(textElements));
